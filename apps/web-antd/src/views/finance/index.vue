@@ -339,7 +339,7 @@ onActivated(() => {
           :title="
             hidden
               ? '导出 Excel（金额已隐藏）'
-              : '导出资产汇总、当前账户和全部历史明细为 Excel'
+              : '导出资产汇总、记录金额和全部历史明细为 Excel'
           "
           @click="exportAssets"
         >
