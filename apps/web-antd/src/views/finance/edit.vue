@@ -21,15 +21,8 @@ import {
   submitAssets,
 } from '#/api/finance/assets';
 
-import {
-  bucketOptions,
-  cents,
-  decimal,
-  formatMoney,
-  templates,
-  today,
-  usePrivacy,
-} from './shared';
+import { cents, decimal, formatMoney, today, usePrivacy } from './shared';
+import { useAssetDictionaries } from './use-asset-dictionaries';
 
 import './finance.css';
 
@@ -38,6 +31,12 @@ interface DraftAccount extends Account {
 }
 const router = useRouter();
 const context = ref<AssetContext>();
+const {
+  bucketOptions,
+  templates,
+  insuranceTypes,
+  label: dictionaryLabel,
+} = useAssetDictionaries(context);
 const rows = ref<DraftAccount[]>([]);
 const selected = ref('liquid');
 const updateDate = ref(today());
@@ -301,7 +300,7 @@ function saveForm() {
 watch(chosenTemplate, (value) => {
   if (modalIndex.value < 0 && form.value) {
     form.value.templateCode = value || null;
-    const template = templates.find((item) => item.value === value);
+    const template = templates.value.find((item) => item.value === value);
     if (template) form.value.name = template.label;
   }
 });
@@ -560,7 +559,7 @@ onBeforeUnmount(() => {
             </button>
             <p class="muted">
               {{ row.dataDate }} ·
-              {{ row.sourceType === 'import' ? 'Excel 导入' : '手动更新' }}
+              {{ dictionaryLabel('sources', row.sourceType) }}
             </p>
           </div>
           <div>
@@ -687,6 +686,7 @@ onBeforeUnmount(() => {
               v-for="template in templates"
               :key="template.value"
               :value="template.value"
+              :disabled="template.disabled"
             >
               {{ template.label }}
             </option>
@@ -733,6 +733,7 @@ onBeforeUnmount(() => {
               v-for="bucket in bucketOptions"
               :key="bucket.value"
               :value="bucket.value"
+              :disabled="bucket.disabled"
             >
               {{ bucket.label }}
             </option>
@@ -740,10 +741,12 @@ onBeforeUnmount(() => {
         <label v-if="form.fundBucket === 'insurance'">保险类型<select v-model="form.insuranceType">
             <option :value="null">暂不设置</option>
             <option
-              v-for="type in ['意外', '医疗', '重疾', '寿险', '其他']"
-              :key="type"
+              v-for="type in insuranceTypes"
+              :key="type.value"
+              :value="type.value"
+              :disabled="type.disabled"
             >
-              {{ type }}
+              {{ type.label }}
             </option>
           </select></label>
         <label>数据日期<input v-model="form.dataDate" type="date" :max="today()" /></label>

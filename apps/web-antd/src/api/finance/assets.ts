@@ -18,6 +18,7 @@ export interface Category {
   enabled: boolean;
 }
 export interface AssetContext {
+  options: AssetDictionaryOptions;
   userId: number;
   tenantId: number;
   family: null | {
@@ -31,6 +32,21 @@ export interface AssetContext {
   members: Member[];
   categories: Category[];
   maxBalance: string;
+}
+export interface AssetDictionaryOption {
+  value: string;
+  label: string;
+  disabled: boolean;
+  color: string;
+  description: string;
+}
+export interface AssetDictionaryOptions {
+  categories: AssetDictionaryOption[];
+  templates: AssetDictionaryOption[];
+  buckets: AssetDictionaryOption[];
+  insuranceTypes: AssetDictionaryOption[];
+  operations: AssetDictionaryOption[];
+  sources: AssetDictionaryOption[];
 }
 export interface Account {
   id?: number;
@@ -80,6 +96,21 @@ export interface HistoryPage {
   list: UpdateRecord[];
   total: number;
 }
+export interface AccountSnapshots {
+  columns: {
+    id: string;
+    name: string;
+    memberId: number;
+    categoryCode: string;
+  }[];
+  rows: {
+    date: string;
+    amounts: Record<string, null | string>;
+    totalAssets: string;
+    totalLiabilities: string;
+    netAssets: string;
+  }[];
+}
 export interface Dashboard {
   overview: Summary;
   accounts: Account[];
@@ -122,6 +153,11 @@ export const exportAssetExcel = (params: {
   excludeFixed: boolean;
   hidden: boolean;
 }) => requestClient.download(`${root}/export-excel`, { params });
+export const getAccountSnapshots = (params: {
+  memberId?: number;
+  excludeFixed: boolean;
+}) =>
+  requestClient.get<AccountSnapshots>(`${root}/account-snapshots`, { params });
 export const getAssetHistory = (params: {
   memberId?: number;
   category?: string;

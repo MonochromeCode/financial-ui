@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
   Account,
+  AccountSnapshots,
   AssetContext,
   Dashboard,
   UpdateRecord,
@@ -16,6 +17,7 @@ import { message, Modal, Pagination } from 'ant-design-vue';
 
 import {
   exportAssetExcel,
+  getAccountSnapshots,
   getAssetAccounts,
   getAssetContext,
   getAssetDashboard,
@@ -23,22 +25,18 @@ import {
   initializeFamily,
 } from '#/api/finance/assets';
 
+import AssetAccountRecords from './asset-account-records.vue';
 import AssetChart from './asset-chart.vue';
 import AssetCompositionChart from './asset-composition-chart.vue';
 import AssetPeriodComparison from './asset-period-comparison.vue';
-import {
-  bucketOptions,
-  cents,
-  displayDate,
-  formatMoney,
-  today,
-  usePrivacy,
-} from './shared';
+import { cents, displayDate, formatMoney, today, usePrivacy } from './shared';
+import { useAssetDictionaries } from './use-asset-dictionaries';
 
 import './finance.css';
 
 const router = useRouter();
 const context = ref<AssetContext>();
+const { bucketOptions, label: dictionaryLabel } = useAssetDictionaries(context);
 const dashboard = ref<Dashboard>();
 const loading = ref(true);
 const failed = ref(false);
@@ -55,6 +53,10 @@ const net = ref(false);
 const selected = ref<string[]>([]);
 const detail = ref<UpdateRecord>();
 const showCalendar = ref(false);
+const showRecordAmounts = ref(false);
+const recordAmountsLoading = ref(false);
+const recordAmountsError = ref(false);
+const recordAmounts = ref<AccountSnapshots>({ columns: [], rows: [] });
 const calendarMonth = ref(today().slice(0, 7));
 const showComposition = ref(false);
 const compositionMode = ref<'amount' | 'ratio'>('amount');
@@ -76,6 +78,7 @@ let generation = 0;
 let accountGeneration = 0;
 let accountFilter: { category?: string; bucket?: string } = {};
 let historyGeneration = 0;
+let recordAmountsGeneration = 0;
 let mounted = false;
 const money = (value: null | string | undefined) =>
   formatMoney(value, hidden.value);
@@ -84,9 +87,7 @@ const recordDate = (record?: UpdateRecord) =>
     ? record.dataDate
     : displayDate(record?.createdAt);
 const recordSource = (record: UpdateRecord) => {
-  if (record.sourceType === 'import') return 'Excel 导入';
-  if (record.operation === 'delete') return '手动删除';
-  return '手动更新';
+  return `${dictionaryLabel('sources', record.sourceType)} · ${dictionaryLabel('operations', record.operation)}`;
 };
 const categories = computed(() =>
   (context.value?.categories || []).filter(
@@ -104,17 +105,6 @@ const monthlyTitle = computed(() => {
   if (!monthly?.fallback || !monthly.latestDate) return '本月资产变化';
   const [year, month] = monthly.latestDate.split('-');
   return `${year}年${Number(month)}月资产变化`;
-});
-const monthlySnapshots = computed(() => {
-  const data = dashboard.value;
-  if (!data?.monthly.latestDate) return [];
-  return data.trends
-    .filter(
-      (snapshot) =>
-        snapshot.date === data.monthly.latestDate ||
-        snapshot.date === data.monthly.baselineDate,
-    )
-    .toSorted((first, second) => second.date.localeCompare(first.date));
 });
 const filteredTrends = computed(() => {
   let since = start.value;
@@ -206,7 +196,7 @@ async function listAccounts(
   accountFilter = filter;
   accountTitle.value = filter.category
     ? categoryName(filter.category)
-    : bucketOptions.find((item) => item.value === filter.bucket)?.label ||
+    : bucketOptions.value.find((item) => item.value === filter.bucket)?.label ||
       '资产账户';
   showAccounts.value = true;
   accountLoading.value = true;
@@ -255,6 +245,24 @@ async function loadHistory() {
     if (current === historyGeneration) historyLoading.value = false;
   }
 }
+async function loadRecordAmounts() {
+  showRecordAmounts.value = true;
+  recordAmountsLoading.value = true;
+  recordAmountsError.value = false;
+  recordAmounts.value = { columns: [], rows: [] };
+  const current = ++recordAmountsGeneration;
+  try {
+    const data = await getAccountSnapshots({
+      memberId: memberId.value,
+      excludeFixed: excludeFixed.value,
+    });
+    if (current === recordAmountsGeneration) recordAmounts.value = data;
+  } catch {
+    if (current === recordAmountsGeneration) recordAmountsError.value = true;
+  } finally {
+    if (current === recordAmountsGeneration) recordAmountsLoading.value = false;
+  }
+}
 async function exportAssets() {
   if (exporting.value || loading.value || failed.value || !dashboard.value)
     return;
@@ -279,6 +287,7 @@ function edit() {
 }
 watch([memberId, excludeFixed], () => {
   void load();
+  if (showRecordAmounts.value) void loadRecordAmounts();
 });
 watch([historyCategory, historyStart, historyEnd], () => {
   historyPage.value = 1;
@@ -468,31 +477,13 @@ onActivated(() => {
               <span class="muted">净资产变化</span><strong>{{ change(dashboard.monthly.netAssets) }}</strong>
             </div>
           </div>
-          <details v-if="monthlySnapshots.length" class="month-details">
-            <summary>查看记录金额</summary>
-            <div class="month-snapshots">
-              <table aria-label="资产变化对比记录">
-                <thead>
-                  <tr>
-                    <th scope="col">记录日期</th>
-                    <th scope="col">总资产</th>
-                    <th scope="col">总负债</th>
-                    <th scope="col">净资产</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="snapshot in monthlySnapshots" :key="snapshot.date">
-                    <th scope="row">
-                      <time :datetime="snapshot.date">{{ snapshot.date }}</time>
-                    </th>
-                    <td>{{ money(snapshot.totalAssets) }}</td>
-                    <td>{{ money(snapshot.totalLiabilities) }}</td>
-                    <td>{{ money(snapshot.netAssets) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </details>
+          <button
+            v-if="dashboard.trends.length"
+            class="text-button month-details"
+            @click="loadRecordAmounts"
+          >
+            查看记录金额 ↗
+          </button>
         </section>
         <section class="asset-card full-width">
           <div class="section-heading">
@@ -546,7 +537,7 @@ onActivated(() => {
               class="bucket-item"
               @click="listAccounts({ bucket: bucket.value })"
             >
-              <span>{{ bucket.label }}</span><small>{{ bucket.term }}</small>
+              <span>{{ bucket.label }}</span><small>{{ bucket.description }}</small>
               <div class="bucket-track">
                 <span
                   class="bucket-fill"
@@ -564,7 +555,7 @@ onActivated(() => {
               v-for="type in dashboard.insuranceTypes"
               :key="type"
               class="tag"
-              >{{ type }}</span><span class="muted">未分配 {{ money(dashboard.buckets.unassigned) }}</span>
+              >{{ dictionaryLabel('insuranceTypes', type) }}</span><span class="muted">未分配 {{ money(dashboard.buckets.unassigned) }}</span>
           </div>
         </section>
         <section class="asset-card">
@@ -753,6 +744,36 @@ onActivated(() => {
           </dd>
         </div>
       </dl>
+    </Modal>
+    <Modal
+      v-model:open="showRecordAmounts"
+      title="历史账户金额明细"
+      :footer="null"
+      :width="1500"
+    >
+      <div class="finance-page" style="padding: 12px 0">
+        <p class="muted mb-4">
+          {{ memberId === undefined ? '当前可见成员' : memberName(memberId) }} ·
+          {{ excludeFixed ? '已排除固定资产' : '包含固定资产' }} · 全部历史日期
+        </p>
+        <div
+          v-if="recordAmountsLoading"
+          class="skeleton"
+          role="status"
+          aria-label="正在加载历史账户金额"
+        ></div>
+        <div v-else-if="recordAmountsError" class="error-card">
+          历史金额加载失败
+          <button class="text-button" @click="loadRecordAmounts">重试</button>
+        </div>
+        <AssetAccountRecords
+          v-else
+          :records="recordAmounts"
+          :members="context?.members || []"
+          :categories="context?.categories || []"
+          :hidden="hidden"
+        />
+      </div>
     </Modal>
     <Modal
       v-model:open="showCalendar"
