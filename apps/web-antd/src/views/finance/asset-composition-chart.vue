@@ -18,6 +18,7 @@ import {
   formatFlowAmount,
 } from './asset-composition';
 import { cents, formatMoney } from './shared';
+import { useChartViewport } from './use-chart-viewport';
 
 const props = withDefaults(
   defineProps<{
@@ -34,13 +35,28 @@ const mode = defineModel<'amount' | 'ratio'>('mode', { default: 'amount' });
 const chartRef = ref<EchartsUIType>();
 const { renderEcharts, getChartInstance } = useEcharts(chartRef);
 const { isDark } = usePreferences();
+const {
+  setViewportRef,
+  transform,
+  zoomLabel,
+  canZoomIn,
+  canZoomOut,
+  dragging,
+  zoomAt,
+  resetView,
+  onWheel,
+  onPointerDown,
+  onPointerMove,
+  onPointerEnd,
+  onKeydown,
+} = useChartViewport();
 const flow = computed(() =>
   buildAssetFlow(props.summary, props.composition, props.accounts),
 );
 const activeMode = computed(() => (props.hidden ? 'hidden' : mode.value));
 const chartHeight = computed(
   () =>
-    `${Math.max(props.expanded ? 470 : 400, flow.value.nodes.filter((node) => node.kind === 'account').length * 44 + 140)}px`,
+    `${Math.max(props.expanded ? 320 : 260, flow.value.nodes.filter((node) => node.kind === 'account').length * 28 + 90)}px`,
 );
 const ratioBase = computed(() =>
   cents(props.summary.totalAssets) > 0n
@@ -101,12 +117,12 @@ async function render() {
     series: [
       {
         type: 'sankey',
-        left: 140,
-        right: 190,
-        top: 88,
-        bottom: 28,
-        nodeWidth: 9,
-        nodeGap: 20,
+        left: 120,
+        right: 170,
+        top: 60,
+        bottom: 16,
+        nodeWidth: 10,
+        nodeGap: 12,
         nodeAlign: 'left',
         layoutIterations: 0,
         draggable: false,
@@ -118,7 +134,7 @@ async function render() {
                   ...node.label,
                   backgroundColor: isDark.value ? '#2b2d39' : '#f4f4f6',
                   borderRadius: 9,
-                  padding: [9, 14],
+                  padding: [6, 10],
                 }
               : node.label,
         })),
@@ -138,12 +154,12 @@ async function render() {
         itemStyle: { borderWidth: 0 },
         label: {
           color: isDark.value ? '#dce4f2' : '#334155',
-          distance: 14,
-          fontSize: 13,
-          lineHeight: 23,
+          distance: 10,
+          fontSize: 12,
+          lineHeight: 20,
           rich: {
-            heading: { color: '#9792b8', fontSize: 14, lineHeight: 23 },
-            value: { fontSize: 19, fontWeight: 600, lineHeight: 26 },
+            heading: { color: '#9792b8', fontSize: 12, lineHeight: 20 },
+            value: { fontSize: 17, fontWeight: 600, lineHeight: 23 },
           },
           formatter: (params) => {
             const node = model.nodes.find((item) => item.name === params.name);
@@ -160,8 +176,11 @@ async function render() {
 }
 
 async function downloadChart() {
-  await render();
-  const chart = getChartInstance();
+  let chart = getChartInstance();
+  if (!chart) {
+    await render();
+    chart = getChartInstance();
+  }
   if (!chart) return;
   const image = chart.getDataURL({
     type: 'png',
@@ -230,25 +249,74 @@ watch(
     </div>
     <div
       v-if="flow.links.length"
+      :ref="setViewportRef"
       class="composition-flow-scroll"
+      :class="{ 'is-dragging': dragging }"
       tabindex="0"
-      aria-label="资产组成图，可横向滚动查看"
+      role="region"
+      aria-label="资产组成图，拖动平移，滚轮缩放；方向键平移，加减键缩放，0 键复位"
+      @wheel="onWheel"
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
+      @pointerup="onPointerEnd"
+      @pointercancel="onPointerEnd"
+      @lostpointercapture="onPointerEnd"
+      @keydown="onKeydown"
+      @dblclick="resetView"
     >
-      <EchartsUI
-        ref="chartRef"
-        class="asset-composition-chart"
-        :height="chartHeight"
-        data-testid="asset-composition-chart"
-      />
+      <div class="composition-flow-canvas" :style="{ transform }">
+        <EchartsUI
+          ref="chartRef"
+          class="asset-composition-chart"
+          :height="chartHeight"
+          data-testid="asset-composition-chart"
+        />
+      </div>
     </div>
-    <div v-else class="empty-chart">
+    <div
+      v-if="flow.links.length"
+      class="composition-zoom-controls"
+      role="group"
+      aria-label="图表缩放"
+    >
+      <button
+        class="composition-download"
+        aria-label="缩小"
+        title="缩小"
+        :disabled="!canZoomOut"
+        @click="zoomAt(1 / 1.2)"
+      >
+        <IconifyIcon icon="lucide:minus" />
+      </button>
+      <span class="composition-zoom-label" aria-live="polite">{{
+        zoomLabel
+      }}</span>
+      <button
+        class="composition-download"
+        aria-label="放大"
+        title="放大"
+        :disabled="!canZoomIn"
+        @click="zoomAt(1.2)"
+      >
+        <IconifyIcon icon="lucide:plus" />
+      </button>
+      <button
+        class="composition-download"
+        aria-label="复位图表"
+        title="复位图表"
+        @click="resetView"
+      >
+        <IconifyIcon icon="lucide:rotate-ccw" />
+      </button>
+    </div>
+    <div v-if="!flow.links.length" class="empty-chart">
       <span class="empty-symbol">↗</span>
       <span>记录资产或负债后，在这里查看资产组成</span>
     </div>
     <p class="muted composition-flow-note">
       {{ description }} 比例以{{
         cents(summary.totalAssets) > 0n ? '总资产' : '总负债'
-      }}为基数，金额较大时以万、亿显示。
+      }}为基数。拖动图表可上下左右移动，滚轮或加减按钮缩放，双击复位。下载图片保存完整图表。
     </p>
     <div v-if="flow.links.length && !expanded" class="composition-insights">
       <div>

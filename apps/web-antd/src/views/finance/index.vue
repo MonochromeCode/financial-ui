@@ -271,17 +271,35 @@ onActivated(() => {
 </script>
 
 <template>
-  <main class="finance-page">
-    <header class="page-heading">
-      <div>
-        <div class="eyebrow">理财有数 · FAMILY ASSETS</div>
-        <h1>家庭资产记账</h1>
-        <p class="muted">
-          {{ context?.family?.name || '把家庭资产，记得清清楚楚。' }}
-        </p>
-      </div>
+  <main class="finance-page finance-dashboard">
+    <header v-if="context?.family" class="dashboard-toolbar">
+      <nav
+        v-if="!loading && !failed && dashboard"
+        class="members"
+        aria-label="成员筛选"
+      >
+        <button
+          class="member-pill"
+          :class="{ active: memberId === undefined }"
+          @click="memberId = undefined"
+        >
+          {{
+            context.owner || context.family.allowViewOthers
+              ? '全部成员'
+              : '我的资产'
+          }}
+        </button>
+        <button
+          v-for="member in context.members"
+          :key="member.id"
+          class="member-pill"
+          :class="{ active: memberId === member.id }"
+          @click="memberId = member.id"
+        >
+          {{ member.displayName }}
+        </button>
+      </nav>
       <button
-        v-if="context?.family"
         class="secondary-button"
         @click="router.push('/finance/assets/manage')"
       >
@@ -330,27 +348,6 @@ onActivated(() => {
       </button>
     </section>
     <template v-else-if="!failed && dashboard && context?.family">
-      <nav class="members" aria-label="成员筛选">
-        <button
-          class="member-pill"
-          :class="{ active: memberId === undefined }"
-          @click="memberId = undefined"
-        >
-          {{
-            context.owner || context.family.allowViewOthers
-              ? '全部成员'
-              : '我的资产'
-          }}
-</button><button
-          v-for="member in context.members"
-          :key="member.id"
-          class="member-pill"
-          :class="{ active: memberId === member.id }"
-          @click="memberId = member.id"
-        >
-          {{ member.displayName }}
-        </button>
-      </nav>
       <div class="asset-grid">
         <section class="asset-card overview">
           <div class="row-between">
@@ -412,28 +409,6 @@ onActivated(() => {
                   : `对比 ${dashboard.monthly.baselineDate}`
             }}
           </p>
-          <div v-if="monthlySnapshots.length" class="month-snapshots">
-            <table aria-label="资产变化对比记录">
-              <thead>
-                <tr>
-                  <th scope="col">记录日期</th>
-                  <th scope="col">总资产</th>
-                  <th scope="col">总负债</th>
-                  <th scope="col">净资产</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="snapshot in monthlySnapshots" :key="snapshot.date">
-                  <th scope="row">
-                    <time :datetime="snapshot.date">{{ snapshot.date }}</time>
-                  </th>
-                  <td>{{ money(snapshot.totalAssets) }}</td>
-                  <td>{{ money(snapshot.totalLiabilities) }}</td>
-                  <td>{{ money(snapshot.netAssets) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
           <div
             v-if="dashboard.monthly.latestDate"
             class="month-number"
@@ -453,6 +428,31 @@ onActivated(() => {
               <span class="muted">净资产变化</span><strong>{{ change(dashboard.monthly.netAssets) }}</strong>
             </div>
           </div>
+          <details v-if="monthlySnapshots.length" class="month-details">
+            <summary>查看记录金额</summary>
+            <div class="month-snapshots">
+              <table aria-label="资产变化对比记录">
+                <thead>
+                  <tr>
+                    <th scope="col">记录日期</th>
+                    <th scope="col">总资产</th>
+                    <th scope="col">总负债</th>
+                    <th scope="col">净资产</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="snapshot in monthlySnapshots" :key="snapshot.date">
+                    <th scope="row">
+                      <time :datetime="snapshot.date">{{ snapshot.date }}</time>
+                    </th>
+                    <td>{{ money(snapshot.totalAssets) }}</td>
+                    <td>{{ money(snapshot.totalLiabilities) }}</td>
+                    <td>{{ money(snapshot.netAssets) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
         </section>
         <section class="asset-card full-width">
           <div class="section-heading">
