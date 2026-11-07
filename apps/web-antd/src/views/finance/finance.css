@@ -152,6 +152,12 @@
 .finance-page .dashboard-toolbar .secondary-button {
   flex-shrink: 0;
   padding: 8px 12px;
+}
+
+.finance-page .dashboard-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
   margin-left: auto;
 }
 

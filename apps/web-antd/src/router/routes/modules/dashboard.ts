@@ -22,6 +22,15 @@ const routes: RouteRecordRaw[] = [
           title: '家庭资产',
         },
       },
+      {
+        name: 'GridStrategies',
+        path: 'grid',
+        component: () => import('#/views/finance/grid/index.vue'),
+        meta: {
+          icon: 'lucide:chart-no-axes-combined',
+          title: '网格策略',
+        },
+      },
     ],
   },
   {

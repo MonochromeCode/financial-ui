@@ -10,10 +10,12 @@ import { computed, onActivated, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { IconifyIcon } from '@vben/icons';
+import { downloadFileFromBlobPart } from '@vben/utils';
 
 import { message, Modal, Pagination } from 'ant-design-vue';
 
 import {
+  exportAssetExcel,
   getAssetAccounts,
   getAssetContext,
   getAssetDashboard,
@@ -23,6 +25,7 @@ import {
 
 import AssetChart from './asset-chart.vue';
 import AssetCompositionChart from './asset-composition-chart.vue';
+import AssetPeriodComparison from './asset-period-comparison.vue';
 import {
   bucketOptions,
   cents,
@@ -39,6 +42,7 @@ const context = ref<AssetContext>();
 const dashboard = ref<Dashboard>();
 const loading = ref(true);
 const failed = ref(false);
+const exporting = ref(false);
 const memberId = ref<number>();
 const excludeFixed = ref(false);
 const hidden = usePrivacy();
@@ -251,6 +255,25 @@ async function loadHistory() {
     if (current === historyGeneration) historyLoading.value = false;
   }
 }
+async function exportAssets() {
+  if (exporting.value || loading.value || failed.value || !dashboard.value)
+    return;
+  exporting.value = true;
+  try {
+    const data = await exportAssetExcel({
+      memberId: memberId.value,
+      excludeFixed: excludeFixed.value,
+      hidden: hidden.value,
+    });
+    downloadFileFromBlobPart({
+      fileName: `家庭资产-${today()}.xlsx`,
+      source: data,
+    });
+    message.success('资产 Excel 已导出');
+  } finally {
+    exporting.value = false;
+  }
+}
 function edit() {
   void router.push('/finance/assets/edit');
 }
@@ -299,12 +322,29 @@ onActivated(() => {
           {{ member.displayName }}
         </button>
       </nav>
-      <button
-        class="secondary-button"
-        @click="router.push('/finance/assets/manage')"
-      >
-        <IconifyIcon icon="lucide:settings-2" class="mr-1 inline-block" /> 管理
-      </button>
+      <div class="dashboard-actions">
+        <button
+          class="secondary-button"
+          :disabled="exporting || loading || failed || !dashboard"
+          :aria-busy="exporting"
+          :title="
+            hidden
+              ? '导出 Excel（金额已隐藏）'
+              : '导出资产汇总、当前账户和全部历史明细为 Excel'
+          "
+          @click="exportAssets"
+        >
+          <IconifyIcon icon="lucide:download" class="mr-1 inline-block" />
+          {{ exporting ? '导出中…' : '导出' }}
+        </button>
+        <button
+          class="secondary-button"
+          @click="router.push('/finance/assets/manage')"
+        >
+          <IconifyIcon icon="lucide:settings-2" class="mr-1 inline-block" />
+          管理
+        </button>
+      </div>
     </header>
     <div v-if="failed" class="error-card">
       资产数据加载失败，请检查网络后重试。<button
@@ -583,6 +623,11 @@ onActivated(() => {
               }}</span></label>
           </div>
         </section>
+        <AssetPeriodComparison
+          :snapshots="dashboard.trends"
+          :categories="categories"
+          :hidden="hidden"
+        />
         <section class="asset-card full-width">
           <div class="section-heading">
             <h2>更新记录<small>每次变化都有迹可循</small></h2>

@@ -117,6 +117,11 @@ export const getAssetDashboard = (params: {
   memberId?: number;
   excludeFixed: boolean;
 }) => requestClient.get<Dashboard>(`${root}/dashboard`, { params });
+export const exportAssetExcel = (params: {
+  memberId?: number;
+  excludeFixed: boolean;
+  hidden: boolean;
+}) => requestClient.download(`${root}/export-excel`, { params });
 export const getAssetHistory = (params: {
   memberId?: number;
   category?: string;
