@@ -84,6 +84,8 @@ export interface Dashboard {
   monthly: Summary & {
     firstRecord: boolean;
     baselineDate: string | null;
+    latestDate: string | null;
+    fallback: boolean;
     categories: Record<string, string>;
   };
   composition: (Category & { amount: string; ratio: string })[];

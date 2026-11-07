@@ -369,16 +369,24 @@ onActivated(() => {
         </section>
         <section class="asset-card">
           <div class="section-heading">
-            <h2>本月资产变化</h2>
+            <h2>
+              {{ dashboard.monthly.fallback ? '最近资产变化' : '本月资产变化' }}
+            </h2>
             <button class="text-button" @click="showCalendar = true">
               资产月历 ↗
             </button>
           </div>
           <p class="muted">
+            <template v-if="dashboard.monthly.latestDate">
+              {{ dashboard.monthly.fallback ? '本月暂无记录 · 最近记录' : '截至' }}
+              {{ dashboard.monthly.latestDate }} ·
+            </template>
             {{
-              dashboard.monthly.firstRecord
-                ? '首次记录 · 暂无上月基准'
-                : `对比 ${dashboard.monthly.baselineDate}`
+              !dashboard.monthly.latestDate
+                ? '暂无资产记录'
+                : dashboard.monthly.firstRecord
+                  ? '首次记录 · 暂无历史基准'
+                  : `对比 ${dashboard.monthly.baselineDate}`
             }}
           </p>
           <div
@@ -434,7 +442,12 @@ onActivated(() => {
                   : `${Number(item.ratio).toFixed(1)}% 占比`
               }}</span>
               <p class="muted mt-3">
-                本月 {{ change(dashboard.monthly.categories[item.code]) }}
+                {{
+                  dashboard.monthly.fallback
+                    ? dashboard.monthly.latestDate?.slice(0, 7)
+                    : '本月'
+                }}
+                {{ change(dashboard.monthly.categories[item.code]) }}
               </p>
             </button>
           </div>
