@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Account, AssetContext } from '#/api/finance/assets';
+
 import {
   computed,
   nextTick,
@@ -9,13 +10,17 @@ import {
   watch,
 } from 'vue';
 import { onBeforeRouteLeave, useRouter } from 'vue-router';
-import { Modal, message } from 'ant-design-vue';
+
 import { IconifyIcon } from '@vben/icons';
+
+import { message, Modal } from 'ant-design-vue';
+
 import {
   getAssetAccounts,
   getAssetContext,
   submitAssets,
 } from '#/api/finance/assets';
+
 import {
   bucketOptions,
   cents,
@@ -25,6 +30,7 @@ import {
   today,
   usePrivacy,
 } from './shared';
+
 import './finance.css';
 
 interface DraftAccount extends Account {
@@ -101,7 +107,7 @@ const index = computed(() =>
   ),
 );
 const finalStep = computed(() => index.value === categories.value.length - 1);
-const money = (value: string | null) => formatMoney(value, hidden.value);
+const money = (value: null | string) => formatMoney(value, hidden.value);
 function total(code: string, member?: number) {
   return decimal(
     rows.value
@@ -187,6 +193,7 @@ async function load() {
     });
     rows.value = accounts.map((row) => ({
       ...fields(row),
+      sourceType: row.sourceType,
       key: `saved-${row.id}`,
     }));
     draftKey = `financial-assets-draft:${result.tenantId}:${result.userId}:${result.family.id}`;
@@ -207,9 +214,11 @@ async function load() {
             );
             const restoredRow = {
               ...fields(item),
+              sourceType:
+                position === -1 ? undefined : rows.value[position]?.sourceType,
               key: item.key || crypto.randomUUID(),
             };
-            if (position < 0) rows.value.push(restoredRow);
+            if (position === -1) rows.value.push(restoredRow);
             else rows.value[position] = restoredRow;
           }
           updateDate.value = draft.updateDate || today();
@@ -317,7 +326,7 @@ function move(row: DraftAccount, direction: number) {
         item.categoryCode === row.categoryCode &&
         item.memberId === row.memberId,
     )
-    .sort((first, second) => first.sortOrder - second.sortOrder);
+    .toSorted((first, second) => first.sortOrder - second.sortOrder);
   const position = siblings.findIndex((item) => item.key === row.key);
   const target = position + direction;
   if (target < 0 || target >= siblings.length) return;
@@ -448,7 +457,7 @@ onBeforeUnmount(() => {
         返回首页
       </button>
     </header>
-    <div v-if="loading" class="skeleton" />
+    <div v-if="loading" class="skeleton"></div>
     <div v-else-if="failed" class="error-card">
       编辑数据加载失败，本地草稿已保留。<button
         class="text-button"
@@ -475,15 +484,12 @@ onBeforeUnmount(() => {
             :class="{
               'field-error': categoryStatus(category.code) === '存在校验错误',
             }"
-            >{{ categoryStatus(category.code) }}</strong
-          ><span class="muted"
-            >{{
+            >{{ categoryStatus(category.code) }}</strong><span class="muted">{{
               rows.filter(
                 (row) => !row.deleted && row.categoryCode === category.code,
               ).length
             }}
-            个账户</span
-          >
+            个账户</span>
         </button>
       </nav>
       <div v-if="restored || dirty || storageError" class="draft-banner">
@@ -493,8 +499,7 @@ onBeforeUnmount(() => {
             : restored
               ? '已恢复本地草稿，尚未提交到家庭账本。'
               : `草稿已保存到本机 ${savedAt}`
-        }}</span
-        ><button class="text-button" :disabled="saving" @click="discard">
+        }}</span><button class="text-button" :disabled="saving" @click="discard">
           放弃草稿
         </button>
       </div>
@@ -506,16 +511,13 @@ onBeforeUnmount(() => {
         </p>
       </div>
       <div class="filters mb-5">
-        <label for="asset-update-date">记账日期</label
-        ><input
+        <label for="asset-update-date">记账日期</label><input
           id="asset-update-date"
           v-model="updateDate"
           type="date"
           :max="today()"
           :disabled="saving"
-        /><span class="muted"
-          >当日多次更新保留最后快照，更新明细逐次保留。</span
-        >
+        /><span class="muted">当日多次更新保留最后快照，更新明细逐次保留。</span>
       </div>
       <section
         v-for="member in context.members"
@@ -526,15 +528,13 @@ onBeforeUnmount(() => {
           <div class="category-title">
             <span
               class="category-icon"
-              style="background: #eef4ff; color: #3b82f6"
-              ><IconifyIcon icon="lucide:user-round"
-            /></span>
+              style="color: #3b82f6; background: #eef4ff"
+              ><IconifyIcon icon="lucide:user-round" /></span>
             <h2>{{ member.displayName }}</h2>
             <span
               v-if="!context.owner && member.id !== context.currentMemberId"
               class="muted"
-              >只读</span
-            >
+              >只读</span>
           </div>
           <span>{{ money(total(selected, member.id)) }}</span>
         </div>
@@ -558,7 +558,10 @@ onBeforeUnmount(() => {
             >
               {{ row.name }} <span v-if="canEdit(row)" class="muted">↗</span>
             </button>
-            <p class="muted">{{ row.dataDate }} · 手动更新</p>
+            <p class="muted">
+              {{ row.dataDate }} ·
+              {{ row.sourceType === 'import' ? 'Excel 导入' : '手动更新' }}
+            </p>
           </div>
           <div>
             <input
@@ -581,17 +584,17 @@ onBeforeUnmount(() => {
               :aria-label="`上移${row.name}`"
               @click="move(row, -1)"
             >
-              ↑</button
-            ><button
+              ↑
+</button><button
               class="text-button"
               :disabled="saving"
               :aria-label="`下移${row.name}`"
               @click="move(row, 1)"
             >
-              ↓</button
-            ><button class="text-button" :disabled="saving" @click="edit(row)">
-              编辑</button
-            ><button
+              ↓
+</button><button class="text-button" :disabled="saving" @click="edit(row)">
+              编辑
+</button><button
               class="text-button"
               style="color: #d17878"
               :disabled="saving"
@@ -624,12 +627,10 @@ onBeforeUnmount(() => {
         </button>
       </section>
       <div v-if="rows.some((row) => row.deleted)" class="draft-banner">
-        <span
-          >{{
+        <span>{{
             rows.filter((row) => row.deleted).length
           }}
-          个账户待删除，完成更新后生效</span
-        ><button
+          个账户待删除，完成更新后生效</span><button
           class="text-button"
           :disabled="saving"
           @click="
@@ -649,17 +650,15 @@ onBeforeUnmount(() => {
           />隐私保护
         </button>
         <div class="flex items-center gap-4">
-          <span class="muted hidden sm:inline"
-            >第 {{ index + 1 }} / {{ categories.length }} 类 ·
-            {{ changes.length }} 项修改</span
-          ><button
+          <span class="muted hidden sm:inline">第 {{ index + 1 }} / {{ categories.length }} 类 ·
+            {{ changes.length }} 项修改</span><button
             v-if="!finalStep"
             class="primary-button"
             :disabled="saving"
             @click="next"
           >
-            下一类 →</button
-          ><button
+            下一类 →
+</button><button
             v-else
             class="primary-button"
             :disabled="saving || !dirty"
@@ -677,7 +676,8 @@ onBeforeUnmount(() => {
       ok-text="保存到草稿"
       cancel-text="取消"
       @ok="saveForm"
-      ><div v-if="form" class="finance-form my-5">
+    >
+      <div v-if="form" class="finance-form my-5">
         <label
           v-if="modalIndex < 0 && form.categoryCode === 'liquid'"
           class="wide"
@@ -690,24 +690,20 @@ onBeforeUnmount(() => {
             >
               {{ template.label }}
             </option>
-          </select></label
-        >
-        <label class="wide"
-          >账户名称<input
+          </select></label>
+        <label class="wide">账户名称<input
             v-model="form.name"
             maxlength="80"
             placeholder="例如：工资卡、住房估值"
         /></label>
-        <label
-          >余额 / 估值（元）<input
+        <label>余额 / 估值（元）<input
             v-model="form.balance"
             inputmode="decimal"
             :type="hidden ? 'password' : 'text'"
             maxlength="20"
             placeholder="待填写，区别于 0"
         /></label>
-        <label
-          >所属成员<select v-model="form.memberId">
+        <label>所属成员<select v-model="form.memberId">
             <option
               v-for="member in editableMembers"
               :key="member.id"
@@ -715,10 +711,8 @@ onBeforeUnmount(() => {
             >
               {{ member.displayName }}
             </option>
-          </select></label
-        >
-        <label
-          >资产分类<select
+          </select></label>
+        <label>资产分类<select
             v-model="form.categoryCode"
             :disabled="!!form.templateCode"
           >
@@ -729,10 +723,8 @@ onBeforeUnmount(() => {
             >
               {{ category.name }}
             </option>
-          </select></label
-        >
-        <label
-          >四笔钱归属<select
+          </select></label>
+        <label>四笔钱归属<select
             v-model="form.fundBucket"
             :disabled="form.categoryCode === 'liability'"
           >
@@ -744,10 +736,8 @@ onBeforeUnmount(() => {
             >
               {{ bucket.label }}
             </option>
-          </select></label
-        >
-        <label v-if="form.fundBucket === 'insurance'"
-          >保险类型<select v-model="form.insuranceType">
+          </select></label>
+        <label v-if="form.fundBucket === 'insurance'">保险类型<select v-model="form.insuranceType">
             <option :value="null">暂不设置</option>
             <option
               v-for="type in ['意外', '医疗', '重疾', '寿险', '其他']"
@@ -755,23 +745,19 @@ onBeforeUnmount(() => {
             >
               {{ type }}
             </option>
-          </select></label
-        >
-        <label
-          >数据日期<input v-model="form.dataDate" type="date" :max="today()"
-        /></label>
-        <label class="wide"
-          >备注<textarea
+          </select></label>
+        <label>数据日期<input v-model="form.dataDate" type="date" :max="today()" /></label>
+        <label class="wide">备注<textarea
             v-model="form.remark"
             maxlength="500"
             rows="2"
             placeholder="选填"
-          />
+          ></textarea>
         </label>
         <p v-if="formError" class="wide" style="color: #d35e5e">
           {{ formError }}
         </p>
-      </div></Modal
-    >
+      </div>
+    </Modal>
   </main>
 </template>

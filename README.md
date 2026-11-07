@@ -29,6 +29,8 @@
 ## 功能
 
 - 家庭总览与成员筛选：资产、负债、净资产、负债率、月度变化。
+- 月度金额对照：列出截至日期和基准日期的总资产、总负债、净资产；本月无记录时展示最近有记录月份并标注年月，零变化显示“0.00 元（持平）”。
+- 资产组成桑基图：净资产/总负债 → 总资产 → 资产分类 → 具体账户，使用真实账户明细，支持金额/比例切换、隐藏金额、成员筛选、放大查看和 PNG 下载。
 - 五类资产编辑：流动资金、固定资产、投资理财、应收款、负债。
 - 四笔钱配置、资产组成、趋势图、月历和更新明细。
 - 家庭账本管理：家庭成员、查看权限、资产分类配置。
@@ -71,9 +73,12 @@ VITE_GLOB_API_URL=/admin-api
 pnpm build:antd
 pnpm --filter @vben/web-antd typecheck
 pnpm exec vitest run apps/web-antd/src/views/finance/__tests__/shared.test.ts --dom
+pnpm exec vitest run apps/web-antd/src/views/finance/__tests__/asset-composition.test.ts
 ```
 
 构建输出目录为 `apps/web-antd/dist`，部署前按环境配置 API 地址。
+
+桑基图的 9 项单元测试覆盖四层流向、同名账户、金额精度、比例、负债守恒、负净资产及空账本。图表依赖总览接口的 `accounts` 字段；部署时同步更新后端，确保真实账户明细随成员筛选返回。
 
 ## 业务代码
 
@@ -88,6 +93,8 @@ apps/web-antd/
         ├── edit.vue                  更新家庭资产
         ├── manage.vue                家庭账本管理
         ├── asset-chart.vue           资产图表
+        ├── asset-composition-chart.vue 资产组成桑基图与图片下载
+        ├── asset-composition.ts      账户流向、金额和比例计算
         ├── shared.ts                 金额与共享逻辑
         └── finance.css               页面样式
 ```
@@ -99,6 +106,8 @@ apps/web-antd/
 | 家庭账本管理 | `/finance/assets/manage` |
 
 后端金额使用十进制字符串返回，前端即时汇总使用整数分。权限由后端校验，页面按当前用户的家庭范围展示数据。
+
+月度对比取最近快照与该快照所在月份之前的最后一次快照；无基准时提示首次记录，无快照时显示暂无资产记录。金额对照和桑基图均遵循成员筛选、排除固定资产及金额隐私状态。已有 Excel 导入记录按数据日期展示，并保留来源标识。
 
 ## 许可与来源
 

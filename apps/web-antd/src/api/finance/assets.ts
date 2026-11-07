@@ -2,7 +2,7 @@ import { requestClient } from '#/api/request';
 
 export interface Member {
   id: number;
-  userId: number | null;
+  userId: null | number;
   displayName: string;
   role: string;
   sortOrder: number;
@@ -38,13 +38,14 @@ export interface Account {
   memberId: number;
   categoryCode: string;
   name: string;
-  templateCode: string | null;
-  balance: string | null;
-  fundBucket: string | null;
-  insuranceType: string | null;
+  templateCode: null | string;
+  balance: null | string;
+  fundBucket: null | string;
+  insuranceType: null | string;
   dataDate: string;
   sortOrder: number;
   remark: string;
+  sourceType?: string;
   updatedAt?: string;
   deleted?: boolean;
 }
@@ -52,8 +53,8 @@ export interface Summary {
   totalAssets: string;
   totalLiabilities: string;
   netAssets: string;
-  debtRatio: string | null;
-  updatedAt?: string | null;
+  debtRatio: null | string;
+  updatedAt?: null | string;
 }
 export interface Snapshot extends Summary {
   date: string;
@@ -65,12 +66,12 @@ export interface UpdateRecord {
   accountName: string;
   memberId: number;
   categoryCode: string;
-  previousBalance: string | null;
-  currentBalance: string | null;
+  previousBalance: null | string;
+  currentBalance: null | string;
   changeAmount: string;
   operation: string;
   operatorUserId: number;
-  operatorName: string | null;
+  operatorName: null | string;
   sourceType: string;
   dataDate: string;
   createdAt: string;
@@ -81,10 +82,11 @@ export interface HistoryPage {
 }
 export interface Dashboard {
   overview: Summary;
+  accounts: Account[];
   monthly: Summary & {
     firstRecord: boolean;
-    baselineDate: string | null;
-    latestDate: string | null;
+    baselineDate: null | string;
+    latestDate: null | string;
     fallback: boolean;
     categories: Record<string, string>;
   };

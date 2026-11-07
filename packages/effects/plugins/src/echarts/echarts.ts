@@ -5,6 +5,7 @@ import {
   LineChart,
   PieChart,
   RadarChart,
+  SankeyChart,
 } from 'echarts/charts';
 import {
   DatasetComponent,
@@ -33,6 +34,7 @@ echarts.use([
   TitleComponent,
   PieChart,
   RadarChart,
+  SankeyChart,
   TooltipComponent,
   GridComponent,
   DatasetComponent,
