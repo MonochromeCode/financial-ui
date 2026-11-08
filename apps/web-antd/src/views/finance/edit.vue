@@ -525,10 +525,9 @@ onBeforeUnmount(() => {
       >
         <div class="section-heading">
           <div class="category-title">
-            <span
-              class="category-icon"
-              style="color: #3b82f6; background: #eef4ff"
-              ><IconifyIcon icon="lucide:user-round" /></span>
+            <span class="category-icon member-icon">
+              <IconifyIcon icon="lucide:user-round" />
+            </span>
             <h2>{{ member.displayName }}</h2>
             <span
               v-if="!context.owner && member.id !== context.currentMemberId"

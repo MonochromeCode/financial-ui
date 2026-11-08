@@ -221,7 +221,7 @@ watch(
 
 .comparison-tabs button[aria-pressed='true'] {
   font-weight: 600;
-  color: #2563eb;
+  color: var(--asset-primary);
   background: var(--asset-card);
   box-shadow: 0 1px 5px #1a39740d;
 }
@@ -310,7 +310,7 @@ watch(
 .comparison-details summary {
   width: fit-content;
   font-size: 12px;
-  color: #2563eb;
+  color: var(--asset-primary);
   cursor: pointer;
 }
 

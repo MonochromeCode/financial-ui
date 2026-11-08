@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import type { EchartsUIType } from '@vben/plugins/echarts';
+
 import type { Category, Snapshot } from '#/api/finance/assets';
+
 import { nextTick, onMounted, ref, watch } from 'vue';
+
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
+import { preferences } from '@vben/preferences';
+
 import { formatMoney } from './shared';
 
 const props = defineProps<{
@@ -16,11 +21,12 @@ const chartRef = ref<EchartsUIType>();
 const { renderEcharts } = useEcharts(chartRef);
 async function render() {
   await nextTick();
+  const themeStyles = getComputedStyle(document.documentElement);
   const series = props.net
     ? [
         {
           name: '净资产',
-          color: '#3b82f6',
+          color: `hsl(${themeStyles.getPropertyValue('--primary')})`,
           values: props.snapshots.map((row) => row.netAssets),
         },
       ]
@@ -49,7 +55,12 @@ async function render() {
         formatter: (value: number) =>
           props.hidden ? '****' : value.toLocaleString('zh-CN'),
       },
-      splitLine: { lineStyle: { color: '#e9edf4', type: 'dashed' } },
+      splitLine: {
+        lineStyle: {
+          color: `hsl(${themeStyles.getPropertyValue('--border')})`,
+          type: 'dashed',
+        },
+      },
     },
     tooltip: {
       trigger: 'axis',
@@ -84,6 +95,7 @@ watch(
     props.net,
     props.hidden,
     props.categories,
+    preferences.theme,
   ],
   render,
   { deep: true },
