@@ -169,7 +169,7 @@ catalog:
   lefthook: ^2.1.14
   livekit-client: ^2.22.1
   lodash.clonedeep: ^4.5.0
-  markdown-it: ^14.3.0
+  markdown-it: ^15.0.3
   markmap-common: ^0.18.9
   markmap-lib: ^0.18.12
   markmap-toolbar: ^0.18.12
